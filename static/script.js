@@ -164,6 +164,22 @@ class ChatBot {
                     }).catch(e => console.error('Save error:', e));
                     
                 } catch (puterError) {
+                        // Voice: speak assistant response if enabled (browser TTS)
+                        try {
+                            if (window.chatVoiceEnabled) {
+                                const lang = window.chatVoiceLang || 'en-US';
+                                const spoke = (typeof window.speakTextBrowser === 'function')
+                                    ? window.speakTextBrowser(aiResponse, lang)
+                                    : false;
+                                if (!spoke && typeof window.speakServerFallback === 'function') {
+                                    // fallback to server-side TTS if browser unsupported
+                                    window.speakServerFallback(aiResponse, lang).catch(() => {});
+                                }
+                            }
+                        } catch (ttsErr) {
+                            console.error('TTS error:', ttsErr);
+                        }
+
                     const lastMsg = this.messagesContainer.lastChild;
                     if (lastMsg) this.messagesContainer.removeChild(lastMsg);
                     this.addMessage('assistant', `⚠️ Error: ${puterError.message}`);

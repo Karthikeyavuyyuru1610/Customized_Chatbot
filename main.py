@@ -1,7 +1,14 @@
+import os
 import sqlite3
 import json
 from datetime import datetime
 from config import SYSTEM_PROMPTS
+
+# Optional OpenAI server-side integration
+try:
+    import openai
+except Exception:
+    openai = None
 
 
 class ChatHistory:
@@ -95,7 +102,13 @@ class PuterChatbot:
             "timezone": "UTC",
             "expertise_level": "general",
         }
+        # default model for client-side Puter.js
         self.model = "google/gemini-2.5-flash"
+        # server-side OpenAI model (if using OpenAI)
+        self.openai_model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+        self.openai_key = os.getenv("OPENAI_API_KEY")
+        if self.openai_key and openai:
+            openai.api_key = self.openai_key
     
     def get_system_message(self) -> str:
         """Get current role's system prompt"""
@@ -160,16 +173,45 @@ class PuterChatbot:
         """Prepare chat message for client-side processing"""
         self.history.add_message("user", user_message)
         prepared_message = self.prepare_message(user_message)
-        
-        return {
-            "success": True,
-            "message": prepared_message,
-            "model": self.model
-        }
+        # If OpenAI API key is configured, call server-side OpenAI for response
+        if self.openai_key and openai:
+            try:
+                ai_text = self._generate_openai_response(prepared_message)
+                # save AI response asynchronously via save_ai_response caller
+                self.save_ai_response(ai_text)
+                return {"success": True, "message": ai_text, "model": self.openai_model}
+            except Exception as e:
+                # fallback: return prepared prompt for client-side Puter.js
+                return {"success": False, "error": str(e), "message": prepared_message, "model": self.model}
+
+        # Default: return prepared message for client-side LLM
+        return {"success": True, "message": prepared_message, "model": self.model}
     
     def save_ai_response(self, response: str):
         """Save AI response to history"""
         self.history.add_message("assistant", response)
+
+    def _generate_openai_response(self, prompt: str, temperature: float = 0.2, max_tokens: int = 512) -> str:
+        """Call OpenAI Chat API to generate a response from the prepared prompt.
+
+        We send the system prompt + the prepared prompt as a single user message to keep the call simple.
+        """
+        if not openai:
+            raise RuntimeError("openai package not available")
+
+        # Build messages array: use the system prompt as a system role and send prompt as user content
+        system_msg = self.get_system_message()
+        messages = [
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": prompt}
+        ]
+
+        resp = openai.ChatCompletion.create(model=self.openai_model, messages=messages, temperature=temperature, max_tokens=max_tokens)
+        # Extract text
+        if isinstance(resp, dict) and resp.get("choices"):
+            return resp["choices"][0]["message"]["content"].strip()
+        # Fallback if response structure differs
+        return str(resp)
 
 
 if __name__ == "__main__":

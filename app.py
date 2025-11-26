@@ -8,7 +8,10 @@ app = Flask(__name__, template_folder=".", static_folder="static")
 try:
     chatbot = PuterChatbot()
     print("✅ Chatbot initialized!")
-    print("🎉 FREE Google AI access - No API key needed!")
+    if chatbot.openai_key:
+        print("🔐 OpenAI API key detected - using server-side OpenAI integration")
+    else:
+        print("🎉 Using client-side Puter.js / Gemini (no OpenAI API key detected)")
 except Exception as e:
     print(f"❌ Error: {e}")
     chatbot = None
@@ -101,10 +104,12 @@ def clear_history():
 def status():
     """Check API status"""
     try:
-        return jsonify({
-            "status": "connected",
-            "model": "google/gemini-2.5-flash"
-        }), 200
+        model = getattr(chatbot, 'openai_model', None) if chatbot else None
+        if chatbot and chatbot.openai_key:
+            reported_model = chatbot.openai_model
+        else:
+            reported_model = chatbot.model if chatbot else "unknown"
+        return jsonify({"status": "connected", "model": reported_model}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 

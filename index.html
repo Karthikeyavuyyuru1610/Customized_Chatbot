@@ -17,6 +17,15 @@
                 <p class="subtitle">Powered by Google Gemini AI</p>
             </div>
             <div class="header-right">
+                <label class="voice-toggle" style="margin-right:8px">
+                    <input type="checkbox" id="voiceToggle"> Voice
+                </label>
+                <select id="voiceLang" style="margin-right:8px">
+                    <option value="en-US">English (US)</option>
+                    <option value="en-GB">English (UK)</option>
+                    <option value="hi-IN">Hindi</option>
+                    <option value="es-ES">Español (ES)</option>
+                </select>
                 <button class="btn-icon" id="statusBtn" title="API Status">
                     <span class="status-indicator disconnected"></span>
                     <span class="status-text">Checking...</span>
